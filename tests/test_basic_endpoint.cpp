@@ -1,21 +1,45 @@
-#include <net/if.h>
+/*
+ * Copyright (c) 2023 Runner-2019
+ *
+ * Licensed under the Apache License Version 2.0 with LLVM Exceptions
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *   https://llvm.org/LICENSE.txt
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+// #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
+#include "catch2/catch_test_macros.hpp"
+
+#include "ip/address_v4.hpp"
+#include "ip/address_v6.hpp"
 #include "ip/basic_endpoint.hpp"
 
-using namespace net::ip;
+using net::ip::address_v4;
+using net::ip::address_v6;
+using net::ip::basic_endpoint;
+using net::ip::make_address_v4;
+using net::ip::make_address_v6;
 
 struct mock_protocol {
   static constexpr mock_protocol v6() { return mock_protocol{AF_INET6}; }
+
   static constexpr mock_protocol v4() { return mock_protocol{AF_INET}; }
 
-  constexpr mock_protocol(int family) : family_(family) {}
+  explicit constexpr mock_protocol(int family) : family_(family) {}
+
   constexpr int family() const { return family_; }
 
   // Compare two endpoints for equality.
@@ -27,23 +51,27 @@ struct mock_protocol {
   int family_;
 };
 
-TEST_CASE("[default ctor should return IPv6 any address with the port whose value equals 0]",
-          "[basic_endpoint.ctor]") {
+TEST_CASE(
+    "[default ctor should return IPv6 any address with the port whose value "
+    "equals 0]",
+    "[basic_endpoint.ctor]") {
   basic_endpoint<mock_protocol> endpoint;
   CHECK(endpoint.address().is_v6());
   CHECK(endpoint.address().is_unspecified());
   CHECK(endpoint.port() == 0);
 }
 
-TEST_CASE("[constructor with internet protocol should return any address in default]",
-          "[basic_endpoint.ctor]") {
+TEST_CASE(
+    "[constructor with internet protocol should return any address in default]",
+    "[basic_endpoint.ctor]") {
   basic_endpoint<mock_protocol> endpoint{mock_protocol::v6(), 80};
   CHECK(endpoint.address().is_v6());
   CHECK(endpoint.address().is_unspecified());
   CHECK(endpoint.port() == 80);
 }
 
-TEST_CASE("[constructor with specific address will also set protocol]", "[basic_endpoint.ctor]") {
+TEST_CASE("[constructor with specific address will also set protocol]",
+          "[basic_endpoint.ctor]") {
   address_v6 addr6 = make_address_v6("::ffff:1.1.1.1");
   basic_endpoint<mock_protocol> endpoint6{addr6, 80};
   CHECK(endpoint6.address().is_v6());
@@ -92,7 +120,8 @@ TEST_CASE("[set IPv6 native address]", "[basic_endpoint.ctor]") {
   ::sockaddr_in6 addr6{};
   addr6.sin6_port = htons(80);
   addr6.sin6_scope_id = 5;
-  memcpy(&addr6.sin6_addr.s6_addr, &in6addr_any, sizeof(addr6.sin6_addr.s6_addr));
+  memcpy(&addr6.sin6_addr.s6_addr, &in6addr_any,
+         sizeof(addr6.sin6_addr.s6_addr));
   addr6.sin6_family = AF_INET6;
   basic_endpoint<mock_protocol> endpoint{addr6};
   CHECK(endpoint.protocol().family() == AF_INET6);
@@ -113,9 +142,11 @@ TEST_CASE("[set IPv6 native address]", "[basic_endpoint.ctor]") {
   CHECK(endpoint_link_local.address().to_v6().scope_id() == 5);
 }
 
-TEST_CASE("[native_address should return correct result]", "[basic_endpoint.native_address]") {
+TEST_CASE("[native_address should return correct result]",
+          "[basic_endpoint.native_address]") {
   // test IPv6 version
-  basic_endpoint<mock_protocol> endpoint6{make_address_v6("::ffff:1.1.1.1"), 80};
+  basic_endpoint<mock_protocol> endpoint6{make_address_v6("::ffff:1.1.1.1"),
+                                          80};
   ::sockaddr_storage storage6;
   CHECK(endpoint6.native_address(&storage6) == sizeof(::sockaddr_in6));
   ::sockaddr_in6 native_addr6 = *reinterpret_cast<::sockaddr_in6*>(&storage6);
@@ -151,8 +182,10 @@ TEST_CASE("[native_address should return correct result]", "[basic_endpoint.nati
   // test default ctor
   basic_endpoint<mock_protocol> endpoint_default;
   ::sockaddr_storage storage_default;
-  CHECK(endpoint_default.native_address(&storage_default) == sizeof(::sockaddr_in6));
-  ::sockaddr_in6 native_addr_default = *reinterpret_cast<::sockaddr_in6*>(&storage_default);
+  CHECK(endpoint_default.native_address(&storage_default) ==
+        sizeof(::sockaddr_in6));
+  ::sockaddr_in6 native_addr_default =
+      *reinterpret_cast<::sockaddr_in6*>(&storage_default);
   CHECK(native_addr_default.sin6_family == AF_INET6);
   CHECK(native_addr_default.sin6_scope_id == 0);
   CHECK(native_addr_default.sin6_port == htons(0));

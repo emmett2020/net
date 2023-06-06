@@ -1,11 +1,30 @@
-#include <catch2/catch_test_macros.hpp>
+/*
+ * Copyright (c) 2023 Runner-2019
+ *
+ * Licensed under the Apache License Version 2.0 with LLVM Exceptions
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *   https://llvm.org/LICENSE.txt
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <concepts>
 #include <cstring>
+
+#include "catch2/catch_test_macros.hpp"
 
 #include "buffer.hpp"
 #include "buffer_sequence_adapter.hpp"
 
-using namespace net;
+using net::buffer;
+using net::buffer_sequence_adapter;
+using net::const_buffer;
+using net::mutable_buffer;
 
 TEST_CASE("buffer_sequence_adapter with different mutable_buffer",
           "buffer.buffer_sequence_adapter") {
@@ -21,7 +40,8 @@ TEST_CASE("buffer_sequence_adapter with different mutable_buffer",
 
   using bufs_type = buffer_sequence_adapter<mutable_buffer, mutable_buffer>;
 
-  buffer_sequence_adapter<mutable_buffer, mutable_buffer> b1{buffer(raw_data, 1024)};
+  buffer_sequence_adapter<mutable_buffer, mutable_buffer> b1{
+      buffer(raw_data, 1024)};
   CHECK(b1.buffers()->iov_base == raw_data);
   CHECK(b1.buffers()->iov_len == 1024);
   CHECK(b1.count() == 1);
@@ -31,7 +51,8 @@ TEST_CASE("buffer_sequence_adapter with different mutable_buffer",
   CHECK(bufs_type::first(buffer(raw_data, 1024)).data() == raw_data);
   CHECK(bufs_type::first(buffer(raw_data, 1024)).size() == 1024);
 
-  buffer_sequence_adapter<mutable_buffer, mutable_buffer> b2{buffer(void_ptr_data, 1024)};
+  buffer_sequence_adapter<mutable_buffer, mutable_buffer> b2{
+      buffer(void_ptr_data, 1024)};
   CHECK(b2.buffers()->iov_base == void_ptr_data);
   CHECK(b2.buffers()->iov_len == 1024);
   CHECK(b2.count() == 1);
@@ -42,9 +63,11 @@ TEST_CASE("buffer_sequence_adapter with different mutable_buffer",
   CHECK(bufs_type::first(buffer(void_ptr_data, 1024)).size() == 1024);
 }
 
-TEST_CASE("buffer_sequence_adapter with const_buffer sequence", "buffer.buffer_sequence_adapter") {
+TEST_CASE("buffer_sequence_adapter with const_buffer sequence",
+          "buffer.buffer_sequence_adapter") {
   std::vector<const_buffer> vec{10, const_buffer{}};
-  using bufs_type = buffer_sequence_adapter<const_buffer, std::vector<const_buffer>>;
+  using bufs_type =
+      buffer_sequence_adapter<const_buffer, std::vector<const_buffer>>;
   bufs_type b1{vec};
   CHECK(b1.buffers()[0].iov_base == vec[0].data());
   CHECK(b1.buffers()->iov_len == buffer_size(vec));

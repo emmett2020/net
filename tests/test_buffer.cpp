@@ -1,10 +1,29 @@
-#include <catch2/catch_test_macros.hpp>
+/*
+ * Copyright (c) 2023 Runner-2019
+ *
+ * Licensed under the Apache License Version 2.0 with LLVM Exceptions
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *   https://llvm.org/LICENSE.txt
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <concepts>
 #include <cstring>
 
+#include "catch2/catch_test_macros.hpp"
+
 #include "buffer.hpp"
 
-using namespace net;
+using net::const_buffer;
+using net::const_buffer_sequence;
+using net::mutable_buffer;
+using net::mutable_buffer_sequence;
 
 template <typename T>
 class mock_mutable_contiguous_container {
@@ -16,10 +35,15 @@ class mock_mutable_contiguous_container {
   using const_reference = const T&;
 
   mock_mutable_contiguous_container() {}
+
   std::size_t size() const { return 0; }
+
   iterator begin() { return 0; }
+
   const_iterator begin() const { return 0; }
+
   iterator end() { return 0; }
+
   const_iterator end() const { return 0; }
 };
 
@@ -33,10 +57,15 @@ class mock_const_contiguous_container {
   using const_reference = const T&;
 
   mock_const_contiguous_container() {}
+
   std::size_t size() const { return 0; }
+
   iterator begin() { return 0; }
+
   const_iterator begin() const { return 0; }
+
   iterator end() { return 0; }
+
   const_iterator end() const { return 0; }
 };
 
@@ -69,15 +98,18 @@ TEST_CASE("use buffer_size to get std::string::size()", "buffer.buffer_size") {
   CHECK(buffer_size(net::buffer(str)) == 1024);
 }
 
-TEST_CASE("Create a new modifiable buffer that is offset from the start of another",
-          "buffer.operation+") {
+TEST_CASE(
+    "Create a new modifiable buffer that is offset from the start of another",
+    "buffer.operation+") {
   std::string str(1024, ' ');
   CHECK((net::buffer(str) + 24).data() == &str[24]);
   CHECK((net::buffer(str) + 24).size() == 1000);
 }
 
-TEST_CASE("Create a new non-modifiable buffer that is offset from the start of another",
-          "buffer.operation+") {
+TEST_CASE(
+    "Create a new non-modifiable buffer that is offset from the start of "
+    "another",
+    "buffer.operation+") {
   const std::string str(1024, 'a');
   CHECK((net::buffer(str) + 24).data() == &str[24]);
   CHECK((net::buffer(str) + 24).size() == 1000);
@@ -142,7 +174,8 @@ TEST_CASE("Create a new const buffer from std::string_view", "buffer.buffer") {
   CHECK(net::buffer(str).size() == ::strlen("hello world"));
 }
 
-TEST_CASE("validate mutable_buffer and const_buffer with difference types", "buffer") {
+TEST_CASE("validate mutable_buffer and const_buffer with difference types",
+          "buffer") {
   char raw_data[1024];
   const char const_raw_data[1024]{""};
   void* void_ptr_data = static_cast<void*>(raw_data);
@@ -203,7 +236,8 @@ TEST_CASE("validate mutable_buffer and const_buffer with difference types", "buf
   CHECK(cb2.data() == const_void_ptr_data);
   CHECK(cb2.size() == 1024);
   CHECK(buffer_size(cb2) == 1024);
-  CHECK((cb2 + 256).data() == static_cast<const char*>(const_void_ptr_data) + 256);
+  CHECK((cb2 + 256).data() ==
+        static_cast<const char*>(const_void_ptr_data) + 256);
   CHECK(buffer_copy(mb2, cb2) == 1024);
   CHECK(buffer_copy(mb2 + 1000, cb2) == 24);
 
@@ -256,14 +290,16 @@ TEST_CASE("buffer_sequence_begin and buffer_sequence_end should work",
   CHECK(buffer_sequence_end(mb_vec) == mb_vec.end());
 }
 
-TEST_CASE("mutable_buffer should satisfy mutable_buffer_sequence", "buffer.concept") {
+TEST_CASE("mutable_buffer should satisfy mutable_buffer_sequence",
+          "buffer.concept") {
   CHECK(mutable_buffer_sequence<mutable_buffer>);
   CHECK(mutable_buffer_sequence<std::vector<mutable_buffer>>);
   CHECK(!mutable_buffer_sequence<std::vector<char>>);
   CHECK(!mutable_buffer_sequence<std::string>);
 }
 
-TEST_CASE("const_buffer should satisfy const_buffer_sequence", "buffer.concept") {
+TEST_CASE("const_buffer should satisfy const_buffer_sequence",
+          "buffer.concept") {
   CHECK(const_buffer_sequence<const_buffer>);
   CHECK(const_buffer_sequence<std::vector<const_buffer>>);
   CHECK(!const_buffer_sequence<const std::vector<char>>);

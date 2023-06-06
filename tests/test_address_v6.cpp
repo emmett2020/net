@@ -1,45 +1,80 @@
+/*
+ * Copyright (c) 2023 Runner-2019
+ *
+ * Licensed under the Apache License Version 2.0 with LLVM Exceptions
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *   https://llvm.org/LICENSE.txt
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include <catch2/catch_test_macros.hpp>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
+#include "catch2/catch_test_macros.hpp"
+#include "fmt/format.h"
+
 #include "ip/address_v6.hpp"
 
-using namespace net::ip;
+using net::ip::address_v4;
+using net::ip::address_v6;
+using net::ip::make_address_v4;
+using net::ip::make_address_v6;
+using net::ip::v4_mapped_t;
 
-static constexpr address_v6::bytes_type unspecified{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-static constexpr address_v6::bytes_type loopback{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
-static constexpr address_v6::bytes_type link_local{0xfe, 0x80, 0, 0, 0,    0,    0,    0,
-                                                   0,    0,    0, 0, 0x11, 0x12, 0x13, 0x14};
-static constexpr address_v6::bytes_type site_local{0xfe, 0xc0, 0, 0, 0,    0,    0,    0,
-                                                   0,    0,    0, 0, 0x11, 0x12, 0x13, 0x14};
-static constexpr address_v6::bytes_type v4_mapped{0, 0, 0,    0,    0, 0, 0,    0,
-                                                  0, 0, 0xff, 0xff, 0, 0, 0xfe, 0xff};
-static constexpr address_v6::bytes_type multicast{0xff, 0, 0,    0,    0,    0,    0,    0,
-                                                  0,    0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
+static constexpr address_v6::bytes_type unspecified{0, 0, 0, 0, 0, 0, 0, 0,
+                                                    0, 0, 0, 0, 0, 0, 0, 0};
+
+static constexpr address_v6::bytes_type loopback{0, 0, 0, 0, 0, 0, 0, 0,
+                                                 0, 0, 0, 0, 0, 0, 0, 1};
+
+static constexpr address_v6::bytes_type link_local{
+    0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x11, 0x12, 0x13, 0x14};
+
+static constexpr address_v6::bytes_type site_local{
+    0xfe, 0xc0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x11, 0x12, 0x13, 0x14};
+
+static constexpr address_v6::bytes_type v4_mapped{
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0, 0, 0xfe, 0xff};
+
+static constexpr address_v6::bytes_type multicast{
+    0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
+
 static constexpr address_v6::bytes_type multicast_global{
     0xff, 0x0e, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
+
 static constexpr address_v6::bytes_type multicast_link_local{
     0xff, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
+
 static constexpr address_v6::bytes_type multicast_node_local{
     0xff, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
+
 static constexpr address_v6::bytes_type multicast_org_local{
     0xff, 0x08, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
+
 static constexpr address_v6::bytes_type multicast_site_local{
     0xff, 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0x09, 0x10, 0x11, 0x12, 0x13, 0x14};
 
-TEST_CASE("[default ctor should return unspecified address]", "[address_v6.ctor]") {
+TEST_CASE("[default ctor should return unspecified address]",
+          "[address_v6.ctor]") {
   address_v6 unspecified_addr{};
   CHECK(unspecified_addr.to_bytes() == unspecified);
   CHECK(unspecified_addr.to_string() == "::");
   CHECK(unspecified_addr.is_unspecified());
 }
 
-TEST_CASE("[construct an address from bytes of different network type]", "[address_v6.ctor]") {
+TEST_CASE("[construct an address from bytes of different network type]",
+          "[address_v6.ctor]") {
   address_v6 unspecified_addr{unspecified};
   CHECK(unspecified_addr.to_bytes() == unspecified);
   CHECK(unspecified_addr.to_string() == "::");
@@ -117,15 +152,17 @@ TEST_CASE("[operation <=> should work]", "[address_v6.comparision]") {
   CHECK(address_v6{loopback} > address_v6{unspecified});
 }
 
-TEST_CASE("[native_address should return sockaddr_storage]", "[address_v6.native_address]") {
+TEST_CASE("[native_address should return sockaddr_storage]",
+          "[address_v6.native_address]") {
   address_v6 normal{multicast};
   ::sockaddr_storage storage;
   socklen_t size = normal.native_address(&storage, 80);
   CHECK(size == sizeof(::sockaddr_in6));
-  auto addr = *reinterpret_cast<::sockaddr_in6 *>(&storage);
+  auto addr = *reinterpret_cast<::sockaddr_in6*>(&storage);
   CHECK(addr.sin6_family == AF_INET6);
   CHECK(addr.sin6_port == htons(80));
-  CHECK(std::bit_cast<address_v6::bytes_type>(addr.sin6_addr.s6_addr) == multicast);
+  CHECK(std::bit_cast<address_v6::bytes_type>(addr.sin6_addr.s6_addr) ==
+        multicast);
 }
 
 TEST_CASE("[pass well-formed address to make_address_v6 should work]",
@@ -133,19 +170,23 @@ TEST_CASE("[pass well-formed address to make_address_v6 should work]",
   CHECK(make_address_v6("::ffff:127.0.0.1").is_v4_mapped());
   CHECK(make_address_v6("::ffff:127.0.0.1").to_string() == "::ffff:127.0.0.1");
 
-  CHECK(make_address_v6(std::string_view{"ff0e::910:1112:1314"}).is_multicast_global());
-  CHECK(make_address_v6(std::string_view{"ff0e::910:1112:1314"}).to_string()
-        == "ff0e::910:1112:1314");
+  CHECK(make_address_v6(std::string_view{"ff0e::910:1112:1314"})
+            .is_multicast_global());
+  CHECK(make_address_v6(std::string_view{"ff0e::910:1112:1314"}).to_string() ==
+        "ff0e::910:1112:1314");
 
   CHECK(make_address_v6(std::string{"fec0::1112:1314"}).is_site_local());
-  CHECK(make_address_v6(std::string{"fec0::1112:1314"}).to_string() == "fec0::1112:1314");
+  CHECK(make_address_v6(std::string{"fec0::1112:1314"}).to_string() ==
+        "fec0::1112:1314");
 
-  CHECK(make_address_v6(v4_mapped_t::v4_mapped, make_address_v4("127.0.0.1")).is_v4_mapped());
-  CHECK(make_address_v6(v4_mapped_t::v4_mapped, make_address_v4("127.0.0.1")).to_string()
-        == "::ffff:127.0.0.1");
+  CHECK(make_address_v6(v4_mapped_t::v4_mapped, make_address_v4("127.0.0.1"))
+            .is_v4_mapped());
+  CHECK(make_address_v6(v4_mapped_t::v4_mapped, make_address_v4("127.0.0.1"))
+            .to_string() == "::ffff:127.0.0.1");
 }
 
-TEST_CASE("[make ip v4 mapped address should work]", "[address_v6.make_address_v4]") {
+TEST_CASE("[make ip v4 mapped address should work]",
+          "[address_v6.make_address_v4]") {
   address_v6 v4_mapped_addr{v4_mapped};
   CHECK(v4_mapped_addr.to_bytes() == v4_mapped);
   CHECK(v4_mapped_addr.to_string() == "::ffff:0.0.254.255");
@@ -154,22 +195,27 @@ TEST_CASE("[make ip v4 mapped address should work]", "[address_v6.make_address_v
   CHECK(v4.to_string() == "0.0.254.255");
 }
 
-TEST_CASE("[make ip v4 mapped address use ill-formed address should return unspecified]",
-          "[address_v6.make_address_v6]") {
+TEST_CASE(
+    "[make ip v4 mapped address use ill-formed address should return "
+    "unspecified]",
+    "[address_v6.make_address_v6]") {
   address_v6 not_v4_mapped_addr = make_address_v6("fec0::1112:1314");
   CHECK(!not_v4_mapped_addr.is_v4_mapped());
   address_v4 v4 = make_address_v4(v4_mapped_t::v4_mapped, not_v4_mapped_addr);
   CHECK(v4.is_unspecified());
 }
 
-TEST_CASE("[pass network interface name to make_address_v6 should correctly set scope id]",
-          "[address_v6.make_address_v6]") {
+TEST_CASE(
+    "[pass network interface name to make_address_v6 should correctly set "
+    "scope id]",
+    "[address_v6.make_address_v6]") {
   constexpr auto get_all_if_names = []() -> std::vector<std::string> {
     std::vector<std::string> result;
-    struct if_nameindex *idx = nullptr;
-    struct if_nameindex *if_idx_start = if_nameindex();
+    struct if_nameindex* idx = nullptr;
+    struct if_nameindex* if_idx_start = if_nameindex();
     if (if_idx_start != NULL) {
-      for (idx = if_idx_start; idx->if_index != 0 || idx->if_name != NULL; idx++) {
+      for (idx = if_idx_start; idx->if_index != 0 || idx->if_name != NULL;
+           idx++) {
         result.emplace_back(idx->if_name);
       }
       if_freenameindex(if_idx_start);
@@ -178,29 +224,33 @@ TEST_CASE("[pass network interface name to make_address_v6 should correctly set 
   };
 
   // link local
-  for (const auto &if_name : get_all_if_names()) {
+  for (const auto& if_name : get_all_if_names()) {
     address_v6 v6 = make_address_v6(fmt::format("fe80::1112:1314%{}", if_name));
     CHECK(v6.is_link_local());
     CHECK(v6.scope_id() == if_nametoindex(if_name.data()));
   }
 
   // multicast link local
-  for (const auto &if_name : get_all_if_names()) {
-    address_v6 v6 = make_address_v6(fmt::format("ff02::910:1112:1314%{}", if_name));
+  for (const auto& if_name : get_all_if_names()) {
+    address_v6 v6 =
+        make_address_v6(fmt::format("ff02::910:1112:1314%{}", if_name));
     CHECK(v6.is_multicast_link_local());
     CHECK(v6.scope_id() == if_nametoindex(if_name.data()));
   }
 
   // others
-  for (const auto &if_name : get_all_if_names()) {
-    address_v6 v6 = make_address_v6(fmt::format("ff00::910:1112:1314%{}", if_name));
+  for (const auto& if_name : get_all_if_names()) {
+    address_v6 v6 =
+        make_address_v6(fmt::format("ff00::910:1112:1314%{}", if_name));
     CHECK(v6.is_multicast());
     CHECK(v6.scope_id() == atoi(if_name.data()));
   }
 }
 
-TEST_CASE("[scoped_id should be set to 0 if ill-formed if_name is passed to make_address_v6]",
-          "[address_v6.make_address_v6]") {
+TEST_CASE(
+    "[scoped_id should be set to 0 if ill-formed if_name is passed to "
+    "make_address_v6]",
+    "[address_v6.make_address_v6]") {
   // empty
   CHECK(make_address_v6(fmt::format("ff00::910:1112:1314%")).is_multicast());
   CHECK(make_address_v6(fmt::format("ff00::910:1112:1314%")).scope_id() == 0);
@@ -210,21 +260,24 @@ TEST_CASE("[scoped_id should be set to 0 if ill-formed if_name is passed to make
   CHECK(make_address_v6(fmt::format("ff00::910:1112:1314%||")).scope_id() == 0);
 }
 
-TEST_CASE("get ip v4 address if ip v6 address is v4-mapped", "address_v6.to_v4") {
+TEST_CASE("get ip v4 address if ip v6 address is v4-mapped",
+          "address_v6.to_v4") {
   address_v6 v4_mapped_addr{v4_mapped};
   CHECK(v4_mapped_addr.to_string() == "::ffff:0.0.254.255");
   CHECK(v4_mapped_addr.is_v4_mapped());
   CHECK(v4_mapped_addr.to_v4().to_string() == "0.0.254.255");
 }
 
-TEST_CASE("get unspecified ip v4 address if v6 is not v4-mapped", "address_v6.to_v4") {
+TEST_CASE("get unspecified ip v4 address if v6 is not v4-mapped",
+          "address_v6.to_v4") {
   address_v6 non_v4_mapped_addr{multicast};
   CHECK(!non_v4_mapped_addr.is_v4_mapped());
   CHECK(non_v4_mapped_addr.to_v4().is_unspecified());
 }
 
-TEST_CASE("[pass ill-formed address to make_address_v6 should return unspecified]",
-          "[address_v6.make_address_v6]") {
+TEST_CASE(
+    "[pass ill-formed address to make_address_v6 should return unspecified]",
+    "[address_v6.make_address_v6]") {
   CHECK(make_address_v6("xx:xx").is_unspecified());
   CHECK(make_address_v4("").is_unspecified());
 }

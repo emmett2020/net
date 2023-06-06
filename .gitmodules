@@ -1,0 +1,12 @@
+[submodule "thirdparties/stdexec"]
+	path = thirdparties/stdexec
+	url = git@github.com:NVIDIA/stdexec.git
+[submodule "thirdparties/status-code"]
+	path = thirdparties/status-code
+	url = git@github.com:ned14/status-code.git
+[submodule "thirdparties/catch2"]
+	path = thirdparties/catch2
+	url = git@github.com:catchorg/Catch2.git
+[submodule "thirdparties/fmt"]
+	path = thirdparties/fmt
+	url = git@github.com:fmtlib/fmt.git

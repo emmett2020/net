@@ -1,5 +1,9 @@
 add_compile_options(-fno-access-control)
-cmake_minimum_required(VERSION 3.22.0)
+cmake_minimum_required(VERSION 3.22.1)
+
+# Add a directory to save the generated executable file. 
+# If the directory is not specified, it is stored with the intermediate
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin/tests/)
 
 set (LIBS Catch2::Catch2WithMain fmt)
 
