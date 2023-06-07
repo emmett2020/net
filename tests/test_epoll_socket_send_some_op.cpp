@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <stdexcept>
 #include <system_error>  // NOLINT
 #include <thread>        // NOLINT
 
@@ -175,8 +176,8 @@ TEST_CASE("[async_send_some with different stdexec stuffs should work]",
   };
 
   // 1. sync_wait, upon_error
-  sender auto s1 =
-      async_send_some(socket, buffer(buf)) | stdexec::upon_error(error_handler);
+  sender auto s1 = async_send_some(socket, buffer(buf))  //
+                   | stdexec::upon_error(error_handler);
   stdexec::sync_wait(std::move(s1));
 
   // 2. sync_wait, then
@@ -186,38 +187,38 @@ TEST_CASE("[async_send_some with different stdexec stuffs should work]",
   sync_wait(std::move(s2));
 
   // 3.  then, upon_error, sync_wait
-  sender auto s3 = async_send_some(socket, buffer(buf))  //
-                   | then([](size_t bytes_transferred) noexcept {}) |
-                   upon_error([](error_code&& ec) noexcept {});
+  sender auto s3 = async_send_some(socket, buffer(buf))              //
+                   | then([](size_t bytes_transferred) noexcept {})  //
+                   | upon_error([](error_code&& ec) noexcept {});
   sync_wait(std::move(s3));
 
   // 4.  then, upon_error, start_detached
-  sender auto s4 = async_send_some(socket, buffer(buf))  //
-                   | then([](size_t bytes_transferred) noexcept {}) |
-                   upon_error([](error_code&& ec) noexcept {});
+  sender auto s4 = async_send_some(socket, buffer(buf))              //
+                   | then([](size_t bytes_transferred) noexcept {})  //
+                   | upon_error([](error_code&& ec) noexcept {});
   stdexec::start_detached(std::move(s4));
   std::this_thread::sleep_for(500ms);
 
   // 5. on, then, upon_error.
   sender auto s5 =
-      stdexec::on(ctx.get_scheduler(),                  //
-                  async_send_some(socket, buffer(buf))  //
-                      | then([](size_t bytes_transferred) noexcept {}) |
-                      upon_error([](error_code&& ec) noexcept {}));
+      stdexec::on(ctx.get_scheduler(),                                  //
+                  async_send_some(socket, buffer(buf))                  //
+                      | then([](size_t bytes_transferred) noexcept {})  //
+                      | upon_error([](error_code&& ec) noexcept {}));
   sync_wait(std::move(s5));
 
   // 6. when_any, then, upon_error.
   sender auto s6 =
-      exec::when_any(async_send_some(socket, buffer(buf))  //
-                     | then([](size_t bytes_transferred) noexcept {}) |
-                     upon_error([](error_code&& ec) noexcept {}));
+      exec::when_any(async_send_some(socket, buffer(buf))              //
+                     | then([](size_t bytes_transferred) noexcept {})  //
+                     | upon_error([](error_code&& ec) noexcept {}));
   sync_wait(std::move(s6));
 
   // 7. when_all, schedule_after, then, upon_error.
   sender auto s7 =
-      stdexec::when_all(async_send_some(socket, buffer(buf))  //
-                            | then([](size_t bytes_transferred) noexcept {}) |
-                            upon_error([](error_code&& ec) noexcept {}),
+      stdexec::when_all(async_send_some(socket, buffer(buf))                  //
+                            | then([](size_t bytes_transferred) noexcept {})  //
+                            | upon_error([](error_code&& ec) noexcept {}),
                         exec::schedule_after(ctx.get_scheduler(), 500ms));
   sync_wait(std::move(s7));
 
@@ -225,10 +226,25 @@ TEST_CASE("[async_send_some with different stdexec stuffs should work]",
   sender auto s8 = async_send_some(socket, buffer(buf))  //
                    | then([](size_t bytes) noexcept {    //
                        return bytes < 1000;
-                     }) |
-                   upon_error([](error_code&& ec) noexcept { return true; })  //
+                     })                                         //
+                   | upon_error([](error_code&& ec) noexcept {  //
+                       return true;
+                     })  //
                    | repeat_effect_until();
   sync_wait(std::move(s8));
+
+  // 9. let_value, just(string), upon_error
+  std::string tmp;
+  sender auto s9 =
+      let_value(just(tmp),
+                [&socket, &buf](std::string) noexcept {
+                  return async_send_some(socket, buffer(buf))  //
+                         | then([](size_t sz) noexcept {})     //
+                         | upon_error([](error_code&&...) noexcept {});
+                })  //
+      | upon_error([](std::exception_ptr e) noexcept {});
+
+  stdexec::sync_wait(std::move(s9));
 }
 
 // TODO: need async_connect cpo

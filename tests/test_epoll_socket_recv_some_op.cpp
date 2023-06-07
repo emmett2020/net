@@ -176,8 +176,8 @@ TEST_CASE("[async_recv_some with different stdexec stuffs should work]",
   };
 
   // 1. sync_wait, upon_error
-  sender auto s1 =
-      async_recv_some(socket, buffer(buf)) | stdexec::upon_error(error_handler);
+  sender auto s1 = async_recv_some(socket, buffer(buf))  //
+                   | stdexec::upon_error(error_handler);
   stdexec::sync_wait(std::move(s1));
 
   // 2. sync_wait, then
@@ -187,38 +187,38 @@ TEST_CASE("[async_recv_some with different stdexec stuffs should work]",
   sync_wait(std::move(s2));
 
   // 3.  then, upon_error, sync_wait
-  sender auto s3 = async_recv_some(socket, buffer(buf))  //
-                   | then([](size_t bytes_transferred) noexcept {}) |
-                   upon_error([](error_code&& ec) noexcept {});
+  sender auto s3 = async_recv_some(socket, buffer(buf))              //
+                   | then([](size_t bytes_transferred) noexcept {})  //
+                   | upon_error([](error_code&& ec) noexcept {});
   sync_wait(std::move(s3));
 
   // 4.  then, upon_error, start_detached
-  sender auto s4 = async_recv_some(socket, buffer(buf))  //
-                   | then([](size_t bytes_transferred) noexcept {}) |
-                   upon_error([](error_code&& ec) noexcept {});
+  sender auto s4 = async_recv_some(socket, buffer(buf))              //
+                   | then([](size_t bytes_transferred) noexcept {})  //
+                   | upon_error([](error_code&& ec) noexcept {});
   stdexec::start_detached(std::move(s4));
   std::this_thread::sleep_for(500ms);
 
   // 5. on, then, upon_error.
   sender auto s5 =
-      stdexec::on(ctx.get_scheduler(),                  //
-                  async_recv_some(socket, buffer(buf))  //
-                      | then([](size_t bytes_transferred) noexcept {}) |
-                      upon_error([](error_code&& ec) noexcept {}));
+      stdexec::on(ctx.get_scheduler(),                                  //
+                  async_recv_some(socket, buffer(buf))                  //
+                      | then([](size_t bytes_transferred) noexcept {})  //
+                      | upon_error([](error_code&& ec) noexcept {}));
   sync_wait(std::move(s5));
 
   // 6. when_any, then, upon_error.
   sender auto s6 =
-      exec::when_any(async_recv_some(socket, buffer(buf))  //
-                     | then([](size_t bytes_transferred) noexcept {}) |
-                     upon_error([](error_code&& ec) noexcept {}));
+      exec::when_any(async_recv_some(socket, buffer(buf))              //
+                     | then([](size_t bytes_transferred) noexcept {})  //
+                     | upon_error([](error_code&& ec) noexcept {}));
   sync_wait(std::move(s6));
 
   // 7. when_all, schedule_after, then, upon_error.
   sender auto s7 =
-      stdexec::when_all(async_recv_some(socket, buffer(buf))  //
-                            | then([](size_t bytes_transferred) noexcept {}) |
-                            upon_error([](error_code&& ec) noexcept {}),
+      stdexec::when_all(async_recv_some(socket, buffer(buf))                  //
+                            | then([](size_t bytes_transferred) noexcept {})  //
+                            | upon_error([](error_code&& ec) noexcept {}),
                         exec::schedule_after(ctx.get_scheduler(), 500ms));
   sync_wait(std::move(s7));
 
@@ -226,8 +226,10 @@ TEST_CASE("[async_recv_some with different stdexec stuffs should work]",
   sender auto s8 = async_recv_some(socket, buffer(buf))  //
                    | then([](size_t bytes) noexcept {    //
                        return bytes < 1000;
-                     }) |
-                   upon_error([](error_code&& ec) noexcept { return true; })  //
+                     })                                         //
+                   | upon_error([](error_code&& ec) noexcept {  //
+                       return true;
+                     })  //
                    | repeat_effect_until();
   sync_wait(std::move(s8));
 }
@@ -293,15 +295,15 @@ TEST_CASE("[CPO: `start` performed operation]",
 
         sender auto s1 = exec::when_any(
             stdexec::on(ctx.get_scheduler(),
-                        async_recv_some(client_socket, buffer(buf)) |
-                            then([](size_t sz) noexcept {
-                              fmt::print("recv sz: {}\n", sz);
-                            })  //
+                        async_recv_some(client_socket, buffer(buf))  //
+                            | then([](size_t sz) noexcept {
+                                fmt::print("recv sz: {}\n", sz);
+                              })  //
                             | upon_error([](error_code&& ec) noexcept {
                                 fmt::print("Error: {}\n", ec.message().c_str());
                               })),
-            exec::schedule_after(ctx.get_scheduler(), 1s) |
-                then([] { fmt::print("Time out after 1s\n"); }));
+            exec::schedule_after(ctx.get_scheduler(), 1s)  //
+                | then([] { fmt::print("Time out after 1s\n"); }));
 
         start_detached(std::move(s1));
       }) |
