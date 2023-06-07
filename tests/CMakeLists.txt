@@ -49,6 +49,9 @@ target_link_libraries(test_epoll_socket_accept_op ${LIBS})
 add_executable(test_epoll_socket_recv_some_op test_epoll_socket_recv_some_op.cpp)
 target_link_libraries(test_epoll_socket_recv_some_op ${LIBS})
 
+add_executable(test_epoll_socket_send_some_op test_epoll_socket_send_some_op.cpp)
+target_link_libraries(test_epoll_socket_send_some_op ${LIBS})
+
 add_executable(test_ip_tcp test_ip_tcp.cpp)
 target_link_libraries(test_ip_tcp ${LIBS})
 

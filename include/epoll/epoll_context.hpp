@@ -97,6 +97,10 @@ class epoll_context final : public execution_context {
   template <typename Receiver, typename Protocol, typename Buffers>
   class socket_recv_some_op;
 
+  // send some operation.
+  template <typename Receiver, typename Protocol, typename Buffers>
+  class socket_send_some_op;
+
   // The time_point type used by scheduler.
   using time_point = monotonic_clock::time_point;
 
@@ -755,7 +759,7 @@ inline size_t epoll_context::execute_local() noexcept {
 }
 
 inline void epoll_context::acquire_completion_queue_items() {
-  epoll_event events[epoll_event_max_count];  
+  epoll_event events[epoll_event_max_count];
   int wait_timeout = local_queue_.empty() ? -1 : 0;
   int result =
       ::epoll_wait(epoll_fd_, events, epoll_event_max_count, wait_timeout);

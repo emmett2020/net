@@ -26,10 +26,12 @@
 #include "epoll/socket_accept_op.hpp"
 #include "epoll/socket_io_base_op.hpp"
 #include "epoll/socket_recv_some_op.hpp"
-#include "exec/repeat_effect_until.hpp"
-#include "fmt/format.h"
+#include "epoll/socket_send_some_op.hpp"
 #include "ip/tcp.hpp"
 #include "net_error.hpp"
+
+#include "exec/repeat_effect_until.hpp"
+#include "fmt/format.h"
 #include "status-code/generic_code.hpp"
 #include "status-code/result.hpp"
 #include "status-code/system_code.hpp"
@@ -108,8 +110,18 @@ int main(int argc, char* argv[]) {
                   | stdexec::then([&buf](size_t sz) noexcept {               //
                       fmt::print("recv sz: {}\n", sz);
                       fmt::print("{}", buf.substr(0, sz));
-                      return false;
+                      return true;
                     })  //
+                  // | stdexec::let_value([&sockets, uuid, &buf](auto...)
+                  // noexcept {
+                  // return stdexec::just(1);
+                  // return net::async_send_some(
+                  //            sockets[uuid].value(),
+                  //            net::const_buffer(net::buffer(buf))) |
+                  //        stdexec::then([](auto...) noexcept { return true;
+                  //        });
+                  // })                                                      //
+                  | stdexec::then([](auto&&...) noexcept { return true; })  //
                   | stdexec::upon_error(
                         [&sockets, uuid](std::error_code&& ec) noexcept {  //
                           fmt::print("Error: {}\n", ec.message().c_str());

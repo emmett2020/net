@@ -12,4 +12,5 @@ message("building example: echo server")
 set(ECHO_SERVER_SRC echo_server/echo_server.cpp)
 add_executable(echo_server ${ECHO_SERVER_SRC})
 target_link_libraries(echo_server ${LIBS})
+# target_compile_options(echo_server PRIVATE -fconcepts-diagnostics-depth=3)
 
