@@ -240,11 +240,25 @@ TEST_CASE("[async_send_some with different stdexec stuffs should work]",
                 [&socket, &buf](std::string) noexcept {
                   return async_send_some(socket, buffer(buf))  //
                          | then([](size_t sz) noexcept {})     //
-                         | upon_error([](error_code&&...) noexcept {});
+                         | upon_error([](error_code&& ec) noexcept {});
                 })  //
       | upon_error([](std::exception_ptr e) noexcept {});
 
   stdexec::sync_wait(std::move(s9));
+
+  // 10. repeat_effect_until, let_value, just(), upon_error
+  sender auto s10 =
+      let_value(
+          just(tmp),
+          [&socket, &buf](std::string) noexcept {
+            return async_send_some(socket, buffer(buf))             //
+                   | then([](size_t sz) noexcept { return true; })  //
+                   | upon_error([](error_code&& ec) noexcept { return true; });
+          })                                                            //
+      | upon_error([](std::exception_ptr e) noexcept { return true; })  //
+      | repeat_effect_until();
+
+  stdexec::sync_wait(std::move(s10));
 }
 
 // TODO: need async_connect cpo

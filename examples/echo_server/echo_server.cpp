@@ -37,12 +37,16 @@
 #include "status-code/system_code.hpp"
 #include "status-code/system_error2.hpp"
 #include "stdexec.hpp"
+#include "stdexec/execution.hpp"
 
 using namespace std::chrono_literals;  // NOLINT
-
+namespace ex = stdexec;
+using net::async_recv_some;
+using net::async_send_some;
+using system_error2::errc;
 using system_error2::system_code;
 
-constexpr port_type mock_port = 12312;
+constexpr port_type port = 12312;
 
 inline uint64_t simple_uuid() {
   static uint64_t n = 0;
@@ -51,96 +55,70 @@ inline uint64_t simple_uuid() {
 
 struct client {
   std::optional<net::ip::tcp::socket> socket;
+  std::string buf;
 };
 
 int main(int argc, char* argv[]) {
-  std::cout << "main thread: " << std::this_thread::get_id() << std::endl;
-
+  // Prepare context.
   net::epoll_context ctx{};
-  std::jthread io_thread([&]() {
-    std::cout << "io thread: " << std::this_thread::get_id() << std::endl;
-    std::cout << "start to run context." << std::endl;
-    ctx.run();
-    std::cout << "stopped to run context." << std::endl;
-  });
-  exec::scope_guard on_context_exit{[&ctx]() noexcept {
+  std::jthread io_thread([&]() { ctx.run(); });
+  exec::scope_guard context_guard{[&ctx]() noexcept {
     ctx.request_stop();
   }};
 
-  // Create acceptor.
-  system_error2::system_code ec{system_error2::errc::success};
-  net::ip::tcp::endpoint ep{net::ip::address_v4::any(), mock_port};
-  net::ip::tcp::acceptor acceptor{ctx, ep, ec, true};
-  acceptor.set_non_blocking(true).success();
-  exec::scope_guard on_acceptor_exit{[&acceptor]() noexcept {
-    acceptor.close().success();
+  // Prepare acceptor.
+  system_code code{errc::success};
+  net::ip::tcp::endpoint ep{net::ip::address_v4::any(), port};
+  net::ip::tcp::acceptor acceptor{ctx, ep, code, true};
+  acceptor.set_non_blocking(true);
+  exec::scope_guard acceptor_guard{[&acceptor]() noexcept {
+    acceptor.close();
   }};
+  fmt::print("Server listen: {}, fd: {}\n", port, acceptor.native_handle());
 
-  fmt::print("server file descriptor: {}\n", acceptor.native_handle());
-  fmt::print("server listen port: {}\n", mock_port);
+  // Prepare sockets and buffer containers.
+  std::unordered_map<uint64_t, client> clients;
 
-  std::unordered_map<uint64_t, std::optional<net::ip::tcp::socket>> sockets;
-  std::unordered_map<uint64_t, std::string> bufs;
-
-  // Accept client tcp request.
-  stdexec::sender auto s =
-      net::async_accept(acceptor)  //
-      | stdexec::then([&bufs, &ctx, &sockets](
-                          net::ip::tcp::socket&& client_socket) noexcept {  //
-          auto peer = client_socket.peer_endpoint();
-          auto local = client_socket.local_endpoint();
-          assert(peer.has_value() && local.has_value());
+  // clang-format off
+  // Echo whatever received from client.
+  ex::sender auto s =
+      net::async_accept(acceptor)
+      | ex::then([&clients, &ctx](net::ip::tcp::socket&& sock) noexcept {
           uint64_t uuid = simple_uuid();
+          fmt::print("client uuid: {}, fd: {}\n", uuid, sock.native_handle());
 
-          fmt::print("client connected: {}\n", client_socket.is_open());
-          fmt::print("connected descriptor: {}, uuid:{}\n",
-                     client_socket.native_handle(), uuid);
-          fmt::print("peer : {}:{}\n", peer.value().address().to_string(),
-                     peer.value().port());
-          fmt::print("local: {}:{}\n", local.value().address().to_string(),
-                     local.value().port());
+          clients[uuid].socket = std::move(sock);
+          clients[uuid].buf.resize(1024);
+          auto& socket = clients[uuid].socket.value();
+          auto& buf = clients[uuid].buf;
 
-          sockets[uuid] = std::move(client_socket);
-          bufs[uuid].resize(1024, 'x');
-          std::string& buf = bufs[uuid];
-
-          stdexec::sender auto s1 = exec::repeat_effect_until(stdexec::on(
+          ex::sender auto s1 = exec::repeat_effect_until(ex::on(
               ctx.get_scheduler(),
-              net::async_recv_some(sockets[uuid].value(), net::buffer(buf))  //
-                  | stdexec::then([&buf](size_t sz) noexcept {               //
-                      fmt::print("recv sz: {}\n", sz);
-                      fmt::print("{}", buf.substr(0, sz));
+              async_recv_some(socket, net::buffer(buf))
+                  | ex::let_value([&buf, &socket](size_t sz) noexcept {
+                      net::const_buffer const_buf = net::buffer(buf, sz);
+                      return async_send_some(socket, const_buf)
+                            | ex::then([](size_t sz) noexcept {
+                              return false;
+                            });
+                    })
+                  | ex::upon_error([&socket](auto&&) noexcept {
+                      fmt::print("close: {}.\n", socket.native_handle());
+                      socket.close();
                       return true;
-                    })  //
-                  // | stdexec::let_value([&sockets, uuid, &buf](auto...)
-                  // noexcept {
-                  // return stdexec::just(1);
-                  // return net::async_send_some(
-                  //            sockets[uuid].value(),
-                  //            net::const_buffer(net::buffer(buf))) |
-                  //        stdexec::then([](auto...) noexcept { return true;
-                  //        });
-                  // })                                                      //
-                  | stdexec::then([](auto&&...) noexcept { return true; })  //
-                  | stdexec::upon_error(
-                        [&sockets, uuid](std::error_code&& ec) noexcept {  //
-                          fmt::print("Error: {}\n", ec.message().c_str());
-                          fmt::print("Close: {}\n",
-                                     sockets[uuid].value().close().success());
-                          return true;
-                        })));
+                    })));
 
-          stdexec::start_detached(std::move(s1));
+          ex::start_detached(std::move(s1));
           return false;
-        }) |
-      stdexec::upon_error([](std::error_code&& ec) noexcept {  //
-        fmt::print("Error message: {}\n", ec.message().c_str());
-        return true;
-      }) |
-      exec::repeat_effect_until();
+        })
+      | ex::upon_error([](std::error_code&& ec) noexcept {
+          fmt::print("Error: {}\n", ec.message().c_str());
+          return true;
+        })
+      | exec::repeat_effect_until();
+  // clang-format on
 
-  stdexec::sync_wait(std::move(s));
-  std::this_thread::sleep_for(150s);
+  ex::sync_wait(std::move(s));
 
   return 0;
 }
