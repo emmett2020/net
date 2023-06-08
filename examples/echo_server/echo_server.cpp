@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
                             });
                     })
                   | ex::upon_error([&socket](auto&&) noexcept {
-                      fmt::print("close: {}.\n", socket.native_handle());
+                      fmt::print("close fd: {}.\n", socket.native_handle());
                       socket.close();
                       return true;
                     })));
